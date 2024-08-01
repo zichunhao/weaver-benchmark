@@ -1,6 +1,5 @@
 #!/bin/bash
 
-PREFIX=$1
 WORKDIR=`pwd`
 echo "Working directory: ${WORKDIR}"
 WEAVER_PATH="${WORKDIR}/weaver-benchmark/weaver"
