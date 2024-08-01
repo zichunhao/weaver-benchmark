@@ -2,7 +2,9 @@
 
 PREFIX=$1
 WORKDIR=`pwd`
+echo "Working directory: ${WORKDIR}"
 WEAVER_PATH="${WORKDIR}/weaver-benchmark/weaver"
+echo "Weaver path: ${WEAVER_PATH}"
 
 # Download miniconda
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda_install.sh
@@ -33,13 +35,16 @@ PREFIX=ak8_MD_inclv8_part_splitreg_addltphp_wmeasonly_manual.useamp.large_fc2048
 DATA_TAG=20230504_ak8_UL17_v8  # the original dataset
 # DATA_TAG=20230504_ak8_UL17_v8_ext1  # the high-mass extended dataset
 DATA_PATH=/mldata/licq/deepjetak8
+echo "Data for training: ${DATA_PATH}/${DATA_TAG}"
 DATA_PATH_IFR=/data/bond/licq/deepjetak8
+echo "Data for inference: ${DATA_PATH_IFR}/${DATA_TAG}"
 config=${WEAVER_PATH}/data_new/inclv7plus/${PREFIX%%.*}.yaml
+echo "Data config: ${config}"
 
 # Training
-NGPUS=2
+NGPUS=1
 
-CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+CUDA_VISIBLE_DEVICES=0 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
 ${WEAVER_PATH}/train.py \
 --train-mode hybrid -o three_coll True -o loss_split_reg True -o loss_gamma 5 \
 -o fc_params '[(2048,0.1)]'  -o embed_dims '[256,1024,256]' -o pair_embed_dims '[128,128,128]' -o num_heads 16 \
