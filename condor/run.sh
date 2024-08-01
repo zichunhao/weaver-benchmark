@@ -9,6 +9,7 @@ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O mi
 bash miniconda_install.sh -b -p ${WORKDIR}/miniconda
 export PATH=$WORKDIR/miniconda/bin:$PATH
 pip install numpy pandas scikit-learn scipy matplotlib tqdm PyYAML
+pip install numba
 pip install uproot3 awkward0 awkward lz4 xxhash
 pip install tables
 pip install onnxruntime-gpu
