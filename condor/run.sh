@@ -28,15 +28,15 @@ git clone -b GloParT --recursive https://github.com/zichunhao/weaver-benchmark.g
 cd "${WEAVER_PATH}"
 mkdir output
 
+lr='5e-4'
+PREFIX=ak8_MD_inclv8_part_splitreg_addltphp_wmeasonly_manual.useamp.large_fc2048.gm5.ddp-bs256-lr${lr}
 DATA_TAG=20230504_ak8_UL17_v8  # the original dataset
 # DATA_TAG=20230504_ak8_UL17_v8_ext1  # the high-mass extended dataset
 DATA_PATH=/mldata/licq/deepjetak8
 DATA_PATH_IFR=/data/bond/licq/deepjetak8
 config=${WEAVER_PATH}/data_new/inclv7plus/${PREFIX%%.*}.yaml
-PREFIX=ak8_MD_inclv8_part_splitreg_addltphp_wmeasonly_manual.useamp.large_fc2048.gm5.ddp-bs256-lr${lr}
 
 # Training
-lr='5e-4'
 NGPUS=2
 
 CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
