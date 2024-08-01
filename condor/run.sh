@@ -1,10 +1,8 @@
 #!/bin/bash
 
 PREFIX=$1
-MODEL_CONFIG=$2
-DATA_CONFIG=$3
-PATH_TO_SAMPLES=$4
 WORKDIR=`pwd`
+WEAVER_PATH="${WORKDIR}/weaver-benchmark/weaver"
 
 # Download miniconda
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda_install.sh
@@ -15,7 +13,7 @@ pip install uproot3 awkward0 lz4 xxhash
 pip install tables
 pip install onnxruntime-gpu
 pip install tensorboard
-pip install torch
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # CUDA environment setup
 export PATH=$PATH:/usr/local/cuda-10.2/bin
@@ -23,30 +21,66 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-10.2/lib64
 export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/cuda-10.2/lib64
 
 # Clone weaver-benchmark
-git clone --recursive https://github.com/colizz/weaver-benchmark.git
-ln -s ../top_tagging weaver-benchmark/weaver/top_tagging
-cd weaver-benchmark/weaver/
+git clone -b GloParT --recursive https://github.com/zichunhao/weaver-benchmark.git
+# ln -s ../top_tagging weaver-benchmark/weaver/top_tagging
+cd "${WEAVER_PATH}"
 mkdir output
 
-# Training, using 1 GPU
-python train.py \
- --data-train ${PATH_TO_SAMPLES}'/prep/top_train_*.root' \
- --data-val ${PATH_TO_SAMPLES}'/prep/top_val_*.root' \
- --fetch-by-file --fetch-step 1 --num-workers 3 \
- --data-config top_tagging/data/${DATA_CONFIG} \
- --network-config top_tagging/networks/${MODEL_CONFIG} \
- --model-prefix output/${PREFIX} \
- --gpus 0 --batch-size 1024 --start-lr 5e-3 --num-epochs 1 --optimizer ranger \
- --log output/${PREFIX}.train.log
 
-# Predicting score, using 1 GPU
-python train.py --predict \
- --data-test ${PATH_TO_SAMPLES}'/prep/top_test_*.root' \
- --num-workers 3 \
- --data-config top_tagging/data/${DATA_CONFIG} \
- --network-config top_tagging/networks/${MODEL_CONFIG} \
- --model-prefix output/${PREFIX}_best_epoch_state.pt \
- --gpus 0 --batch-size 1024 \
- --predict-output output/${PREFIX}_predict.root
+# Training
+lr='5e-4'
+PREFIX=ak8_MD_inclv8_part_splitreg_addltphp_wmeasonly_manual.useamp.large_fc2048.gm5.ddp-bs256-lr${lr}
+config=${WEAVER_PATH}/data_new/inclv7plus/${PREFIX%%.*}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/bond/licq/deepjetak8
+
+NGPUS=3
+CUDA_VISIBLE_DEVICES=0,1,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+${WEAVER_PATH}/train.py \
+--train-mode hybrid -o three_coll True -o loss_split_reg True -o loss_gamma 5 \
+-o fc_params '[(2048,0.1)]'  -o embed_dims '[256,1024,256]' -o pair_embed_dims '[128,128,128]' -o num_heads 16 \
+--use-amp --batch-size 256 --start-lr $lr --num-epochs 50 --optimizer ranger --fetch-step 0.00666667 \
+--backend nccl \
+--data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass2DMesh/*.root' \
+--data-test \
+'hww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root' \
+'higgs2p:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root' \
+'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 8 \
+--network-config ${WEAVER_PATH}/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix ${WEAVER_PATH}/model/${PREFIX}/net \
+--log-file ${WEAVER_PATH}/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
+--predict-output ${WEAVER_PATH}/predict/$PREFIX/pred.root
+
+# Predicting
+NGPUS=1
+python ${WEAVER_PATH}/train.py --predict --gpus 1 \
+--train-mode hybrid -o three_coll True -o loss_split_reg True -o loss_gamma 5 \
+-o fc_params '[(2048,0.1)]'  -o embed_dims '[256,1024,256]' -o pair_embed_dims '[128,128,128]' -o num_heads 16 \
+--use-amp --batch-size 256 --start-lr 1e-3 --num-epochs 50 --optimizer ranger --fetch-step 0.00666667 \
+--data-test \
+'xww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*0.root' \
+'hww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root' \
+'higgs2p:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root' \
+'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
+'ofcttbarfl:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/*.root' \
+'ofcttbarsl:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 8 \
+--network-config ${WEAVER_PATH}/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix ${WEAVER_PATH}/model/${PREFIX}/net_epoch-26_state.pt \
+--log-file ${WEAVER_PATH}/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
+--predict-output ${WEAVER_PATH}/predict/$PREFIX/pred.root
 
 [ -d "runs/" ] && tar -caf output.tar output/ runs/ || tar -caf output.tar output/
