@@ -11,6 +11,7 @@ export PATH=$WORKDIR/miniconda/bin:$PATH
 pip install numpy pandas scikit-learn scipy matplotlib tqdm PyYAML
 pip install numba
 pip install uproot3 awkward0 awkward lz4 xxhash
+pip install weaver-core
 pip install tables
 pip install onnxruntime-gpu
 pip install tensorboard
