@@ -15,7 +15,7 @@ pip install weaver-core
 pip install tables
 pip install onnxruntime-gpu
 pip install tensorboard
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # CUDA environment setup
 export PATH=$PATH:/usr/local/cuda-10.2/bin
