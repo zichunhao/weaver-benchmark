@@ -1,3 +1,3 @@
-[submodule "weaver"]
-	path = weaver
-	url = https://github.com/hqucms/weaver.git
+[submodule "weaver-core-dev"]
+	path = weaver-core-dev
+	url = https://github.com/zichunhao/weaver-core-dev.git
