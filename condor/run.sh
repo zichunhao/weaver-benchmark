@@ -41,6 +41,7 @@ config=${WEAVER_PATH}/data_new/inclv7plus/${PREFIX%%.*}.yaml
 echo "Data config: ${config}"
 
 # Training
+echo "Start training with ${PREFIX}..."
 NGPUS=1
 
 CUDA_VISIBLE_DEVICES=0 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
@@ -71,6 +72,7 @@ ${WEAVER_PATH}/train.py \
 --predict-output ${WEAVER_PATH}/predict/$PREFIX/pred.root
 
 # Predicting
+echo "Start predicting with ${PREFIX}..."
 NGPUS=1
 python ${WEAVER_PATH}/train.py --predict --gpus 1 \
 --train-mode hybrid -o three_coll True -o loss_split_reg True -o loss_gamma 5 \
@@ -87,7 +89,7 @@ python ${WEAVER_PATH}/train.py --predict --gpus 1 \
 --samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
 --data-config ${config} --num-workers 8 \
 --network-config ${WEAVER_PATH}/networks/example_ParticleTransformer2023Tagger_hybrid.py \
---model-prefix ${WEAVER_PATH}/model/${PREFIX}/net_epoch-26_state.pt \
+--model-prefix ${WEAVER_PATH}/model/${PREFIX}/net \
 --log-file ${WEAVER_PATH}/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
 --predict-output ${WEAVER_PATH}/predict/$PREFIX/pred.root
 
